@@ -1,0 +1,247 @@
+# Stoat Chat Configuration
+# Copy this file to configs/Revolt.toml and customize
+
+production = true
+
+[database]
+mongodb = "mongodb://stoat-database"
+redis = "redis://stoat-redis/"
+
+[hosts]
+# Web locations of various services
+# Update these with your domain
+app = "https://chat.example.com"
+api = "https://chat.example.com/api"
+events = "wss://chat.example.com/ws"
+autumn = "https://chat.example.com/autumn"
+january = "https://chat.example.com/january"
+voso_legacy = ""
+voso_legacy_ws = ""
+
+[hosts.livekit]
+# Node name must match [api.livekit.nodes.*] section name
+worldwide = "wss://chat.example.com/livekit"
+
+[rabbit]
+host = "stoat-rabbit"
+port = 5672
+username = "rabbituser"
+password = "rabbitpass"
+
+[api]
+
+[api.registration]
+# Whether an invite should be required for registration
+invite_only = false
+
+[api.smtp]
+# Email server configuration for verification
+# Leave host empty to disable email verification
+host = ""
+username = ""
+password = ""
+from_address = "noreply@example.com"
+# reply_to = "noreply@example.com"
+# port = 587
+# use_tls = true
+
+[api.security]
+# Authifier Shield API key
+authifier_shield_key = ""
+# Legacy voice server management token
+voso_legacy_token = ""
+# Whether services are behind the Cloudflare network
+trust_cloudflare = false
+# easypwned endpoint
+easypwned = ""
+# Tenor API Key (for GIF search)
+tenor_key = ""
+
+[api.security.captcha]
+# hCaptcha configuration
+hcaptcha_key = ""
+hcaptcha_sitekey = ""
+
+[api.workers]
+# Maximum concurrent connections (to proxy server)
+max_concurrent_connections = 50
+
+[api.livekit]
+# How long to ring devices for when calling in dms/groups, in seconds
+call_ring_duration = 30
+
+[api.livekit.nodes]
+
+# IMPORTANT: Node name must match the key in [hosts.livekit]
+# lat and lon are REQUIRED (can be 0.0 for single-node deployments)
+[api.livekit.nodes.worldwide]
+url = "http://stoat-livekit-server:7880"
+lat = 0.0
+lon = 0.0
+key = "43e2a23b5f91"
+secret = "4823d8b08d6d1db95d8d61f6b304e71294e2576234fef9a760"
+
+[api.users]
+
+[pushd]
+# this changes the names of the queues to not overlap
+# prod/beta if they happen to be on the same exchange/instance
+production = true
+
+# Changes how many users are processed in each chunk when resolving role/everyone mentions
+mass_mention_chunk_size = 200
+
+# Queue configuration (usually no changes needed)
+exchange = "revolt.notifications"
+message_queue = "notifications.origin.message"
+mass_mention_queue = "notifications.origin.mass_mention"
+fr_accepted_queue = "notifications.ingest.fr_accepted"
+fr_received_queue = "notifications.ingest.fr_received"
+dm_call_queue = "notifications.ingest.dm_call"
+generic_queue = "notifications.ingest.generic"
+ack_queue = "notifications.process.ack"
+
+[pushd.vapid]
+# Generate your own VAPID keys for web push notifications
+# You can generate these with: npx web-push generate-vapid-keys
+private_key = "YOUR_VAPID_PRIVATE_KEY_BASE64"
+public_key = "YOUR_VAPID_PUBLIC_KEY_BASE64"
+queue = "notifications.outbound.vapid"
+
+[pushd.fcm]
+# Firebase Cloud Messaging (for mobile push notifications)
+queue = "notifications.outbound.fcm"
+key_type = ""
+project_id = ""
+private_key_id = ""
+private_key = ""
+client_email = ""
+client_id = ""
+auth_uri = ""
+token_uri = ""
+auth_provider_x509_cert_url = ""
+client_x509_cert_url = ""
+
+[pushd.apn]
+# Apple Push Notifications (for iOS)
+sandbox = false
+queue = "notifications.outbound.apn"
+pkcs8 = ""
+key_id = ""
+team_id = ""
+
+[files]
+# Encryption key for stored files
+# Generate your own key using: openssl rand -base64 32
+encryption_key = "GENERATE_WITH_openssl_rand_-base64_32"
+
+# Quality used for lossy WebP previews (set to 100 for lossless)
+webp_quality = 80.0
+
+# Mime types that cannot be uploaded or served
+blocked_mime_types = []
+
+# ClamAV service (optional virus scanning)
+# hostname:port
+clamd_host = ""
+
+# Mime types that should be virus scanned (empty = scan all)
+scan_mime_types = [
+    "application/vnd.microsoft.portable-executable",
+    "application/vnd.android.package-archive",
+    "application/zip",
+]
+
+[files.limit]
+min_file_size = 1
+min_resolution = [1, 1]
+max_mega_pixels = 40
+max_pixel_side = 10_000
+
+[files.preview]
+# Maximum image resolution for previews
+attachments = [1280, 1280]
+avatars = [128, 128]
+backgrounds = [1280, 720]
+icons = [128, 128]
+banners = [480, 480]
+emojis = [128, 128]
+
+[files.s3]
+# S3 protocol endpoint (MinIO)
+endpoint = "http://minio:9000"
+path_style_buckets = false
+region = "minio"
+access_key_id = "minioautumn"
+secret_access_key = "minioautumn"
+default_bucket = "revolt-uploads"
+
+[features]
+webhooks_enabled = true
+mass_mentions_send_notifications = true
+mass_mentions_enabled = true
+
+[features.limits]
+
+[features.limits.global]
+group_size = 100
+message_embeds = 5
+message_replies = 5
+message_reactions = 20
+server_emoji = 100
+server_roles = 200
+server_channels = 200
+new_user_hours = 72
+body_limit_size = 20_000_000
+
+[features.limits.new_user]
+outgoing_friend_requests = 5
+bots = 2
+message_length = 2000
+message_attachments = 5
+servers = 50
+voice_quality = 16000
+video = true
+video_resolution = [1080, 720]
+video_aspect_ratio = [0.3, 2.5]
+
+[features.limits.new_user.file_upload_size_limit]
+attachments = 20_000_000
+avatars = 4_000_000
+backgrounds = 6_000_000
+icons = 2_500_000
+banners = 6_000_000
+emojis = 500_000
+
+[features.limits.default]
+outgoing_friend_requests = 10
+bots = 5
+message_length = 2000
+message_attachments = 5
+servers = 100
+voice_quality = 16000
+video = true
+video_resolution = [1080, 720]
+video_aspect_ratio = [0.3, 2.5]
+
+[features.limits.default.file_upload_size_limit]
+attachments = 20_000_000
+avatars = 4_000_000
+backgrounds = 6_000_000
+icons = 2_500_000
+banners = 6_000_000
+emojis = 500_000
+
+[features.advanced]
+process_message_delay_limit = 5
+
+[sentry]
+# Sentry error reporting (optional)
+api = ""
+events = ""
+voice_ingress = ""
+files = ""
+proxy = ""
+pushd = ""
+crond = ""
+gifbox = ""

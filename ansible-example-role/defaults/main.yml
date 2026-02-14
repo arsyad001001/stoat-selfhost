@@ -1,0 +1,12 @@
+stoat_domain: "chat.example.com"
+stoat_external_port: 9009
+
+minio_root_user: minioautumn
+minio_root_password: minioautumn
+rabbitmq_user: rabbituser
+rabbitmq_pass: rabbitpass
+
+revolt_image_tag: "20250930-2"
+
+docker_network: stoat_network
+stoat_file_encryption_key: "my secret key"

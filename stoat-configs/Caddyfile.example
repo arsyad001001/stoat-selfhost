@@ -1,0 +1,59 @@
+# Stoat Chat Caddyfile
+# Copy this file to configs/Caddyfile
+
+:80 {
+	log {
+		output stdout
+		format console
+		level DEBUG
+	}
+
+	# API routes
+	route /api* {
+		uri strip_prefix /api
+		reverse_proxy http://stoat-api:14702 {
+			header_down Location "^/" "/api/"
+		}
+	}
+
+	# LiveKit WebSocket proxy
+	handle /livekit* {
+		uri strip_prefix /livekit
+		reverse_proxy stoat-livekit-server:7880
+	}
+
+	# WebSocket events
+	route /ws {
+		uri strip_prefix /ws
+		reverse_proxy http://stoat-events:14703 {
+			header_down Location "^/" "/ws/"
+		}
+	}
+
+	# File server (Autumn)
+	route /autumn* {
+		uri strip_prefix /autumn
+		reverse_proxy http://stoat-autumn:14704 {
+			header_down Location "^/" "/autumn/"
+		}
+	}
+
+	# Metadata proxy (January)
+	route /january* {
+		uri strip_prefix /january
+		reverse_proxy http://stoat-january:14705 {
+			header_down Location "^/" "/january/"
+		}
+	}
+
+	# GIF proxy (Gifbox)
+	route /gifbox* {
+		uri strip_prefix /gifbox
+		reverse_proxy http://stoat-gifbox:14706 {
+			header_down Location "^/" "/gifbox/"
+		}
+	}
+
+	# Default: Web frontend
+	reverse_proxy http://stoat-web:5000
+}

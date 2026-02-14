@@ -1,0 +1,37 @@
+# LiveKit Server Configuration
+# This is passed via LIVEKIT_CONFIG environment variable in compose.yml
+# You can also mount this file and use: livekit-server --config /path/to/livekit.yaml
+
+# API keys - generate your own:
+#   Key: openssl rand -hex 6
+#   Secret: openssl rand -hex 25
+keys:
+  43e2a23b5f91: 4823d8b08d6d1db95d8d61f6b304e71294e2576234fef9a760
+
+log_level: info
+
+# HTTP port for LiveKit API
+port: 7880
+
+# Redis connection (required for multi-node setups)
+redis:
+  address: stoat-redis:6379
+  # password: your-redis-password  # if Redis has auth enabled
+
+# WebRTC configuration
+rtc:
+  # UDP port range for media streams
+  port_range_start: 50000
+  port_range_end: 50100
+  # TCP port for WebRTC signaling
+  tcp_port: 7881
+  # Set to true if server has a public IP
+  use_external_ip: false
+
+# TURN server (disabled by default)
+# Enable if clients are behind strict NATs
+turn:
+  enabled: false
+  # domain: your-domain.com
+  # tls_port: 5349
+  # udp_port: 3478

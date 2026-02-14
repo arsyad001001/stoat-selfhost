@@ -1,0 +1,49 @@
+:80 {
+	log {
+		output stdout
+		format console
+		level DEBUG
+	}
+
+	route /api* {
+		uri strip_prefix /api
+		reverse_proxy http://stoat-api:14702 {
+			header_down Location "^/" "/api/"
+		}
+	}
+
+	handle /livekit* {
+		uri strip_prefix /livekit
+		reverse_proxy stoat-livekit-server:7880
+	}
+
+	route /ws {
+		uri strip_prefix /ws
+		reverse_proxy http://stoat-events:14703 {
+			header_down Location "^/" "/ws/"
+		}
+	}
+
+	route /autumn* {
+		uri strip_prefix /autumn
+		reverse_proxy http://stoat-autumn:14704 {
+			header_down Location "^/" "/autumn/"
+		}
+	}
+
+	route /january* {
+		uri strip_prefix /january
+		reverse_proxy http://stoat-january:14705 {
+			header_down Location "^/" "/january/"
+		}
+	}
+
+	route /gifbox* {
+		uri strip_prefix /gifbox
+		reverse_proxy http://stoat-gifbox:14706 {
+			header_down Location "^/" "/gifbox/"
+		}
+	}
+
+	reverse_proxy http://stoat-web:5000
+}

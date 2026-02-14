@@ -1,0 +1,294 @@
+# Stoat Chat Docker Compose
+# See stoat-deployment-guide.md for full documentation
+
+networks:
+  stoat_network:
+    driver: bridge
+
+services:
+  # ──────────────────────────────────────────────
+  # MongoDB
+  # ──────────────────────────────────────────────
+  database:
+    image: mongo:latest
+    container_name: stoat-database
+    restart: always
+    networks:
+      - stoat_network
+    volumes:
+      - ./db:/data/db
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo 'db.runCommand(\"ping\").ok' | mongosh localhost:27017/test --quiet"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  # ──────────────────────────────────────────────
+  # Redis (KeyDB)
+  # ──────────────────────────────────────────────
+  redis:
+    image: eqalpha/keydb
+    container_name: stoat-redis
+    restart: always
+    networks:
+      - stoat_network
+    volumes:
+      - ./redis:/data
+
+  # ──────────────────────────────────────────────
+  # RabbitMQ
+  # ──────────────────────────────────────────────
+  rabbit:
+    image: rabbitmq:4
+    container_name: stoat-rabbit
+    restart: always
+    networks:
+      - stoat_network
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-rabbituser}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-rabbitpass}
+    volumes:
+      - ./rabbit:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ──────────────────────────────────────────────
+  # MinIO (S3-compatible storage)
+  # ──────────────────────────────────────────────
+  minio:
+    image: minio/minio
+    container_name: stoat-minio
+    restart: always
+    command: server /data
+    networks:
+      stoat_network:
+        aliases:
+          - minio
+          - revolt-uploads.minio
+          - attachments.minio
+          - avatars.minio
+          - backgrounds.minio
+          - icons.minio
+          - banners.minio
+          - emojis.minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioautumn}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioautumn}
+      MINIO_DOMAIN: minio
+    volumes:
+      - ./minio:/data
+
+  # ──────────────────────────────────────────────
+  # MinIO Bucket Creation (one-shot)
+  # ──────────────────────────────────────────────
+  createbuckets:
+    image: minio/mc
+    container_name: stoat-createbuckets
+    networks:
+      - stoat_network
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      while ! /usr/bin/mc ready minio; do
+        /usr/bin/mc alias set minio http://stoat-minio:9000 $${MINIO_ROOT_USER:-minioautumn} $${MINIO_ROOT_PASSWORD:-minioautumn};
+        echo 'Waiting for minio...' && sleep 1;
+      done;
+      /usr/bin/mc mb minio/revolt-uploads || true;
+      exit 0;
+      "
+
+  # ──────────────────────────────────────────────
+  # LiveKit (Voice and Video)
+  # ──────────────────────────────────────────────
+  livekit-server:
+    image: livekit/livekit-server:v1.9.0
+    container_name: stoat-livekit-server
+    restart: always
+    command:
+      - --disable-strict-config
+    networks:
+      - stoat_network
+    ports:
+      - "7881:7881/tcp"
+      - "50000-50100:50000-50100/udp"
+    environment:
+      LIVEKIT_CONFIG: |
+        keys:
+          ${LIVEKIT_KEY:-43e2a23b5f91}: ${LIVEKIT_SECRET:-4823d8b08d6d1db95d8d61f6b304e71294e2576234fef9a760}
+        log_level: info
+        port: 7880
+        redis:
+          address: stoat-redis:6379
+        rtc:
+          port_range_end: 50100
+          port_range_start: 50000
+          tcp_port: 7881
+          use_external_ip: false
+        turn:
+          enabled: false
+    depends_on:
+      - redis
+
+  # ──────────────────────────────────────────────
+  # Caddy (Reverse Proxy)
+  # ──────────────────────────────────────────────
+  caddy:
+    image: caddy:latest
+    container_name: stoat-caddy
+    restart: always
+    networks:
+      - stoat_network
+    ports:
+      - "${STOAT_EXTERNAL_PORT:-9009}:80"
+    volumes:
+      - ./configs/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy-data:/data
+      - ./caddy-config:/config
+    depends_on:
+      - api
+      - events
+      - autumn
+      - january
+      - gifbox
+      - web
+
+  # ──────────────────────────────────────────────
+  # API Server
+  # ──────────────────────────────────────────────
+  api:
+    image: ghcr.io/stoatchat/api:v0.11.0
+    container_name: stoat-api
+    restart: always
+    networks:
+      - stoat_network
+    volumes:
+      - ./configs/Revolt.toml:/Revolt.toml:ro
+    depends_on:
+      database:
+        condition: service_healthy
+      rabbit:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  # ──────────────────────────────────────────────
+  # Events Service (WebSocket)
+  # ──────────────────────────────────────────────
+  events:
+    image: ghcr.io/stoatchat/events:v0.11.0
+    container_name: stoat-events
+    restart: always
+    networks:
+      - stoat_network
+    volumes:
+      - ./configs/Revolt.toml:/Revolt.toml:ro
+    depends_on:
+      database:
+        condition: service_healthy
+      rabbit:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  # ──────────────────────────────────────────────
+  # Web App (Patched for Voice/Video)
+  # ──────────────────────────────────────────────
+  web:
+    image: baptisterajaut/stoatchat-web:dev
+    container_name: stoat-web
+    restart: always
+    networks:
+      - stoat_network
+    environment:
+      REVOLT_PUBLIC_URL: "https://${STOAT_DOMAIN:-chat.example.com}/api"
+      VITE_WS_URL: "wss://${STOAT_DOMAIN:-chat.example.com}/ws"
+      VITE_MEDIA_URL: "https://${STOAT_DOMAIN:-chat.example.com}/autumn"
+      VITE_PROXY_URL: "https://${STOAT_DOMAIN:-chat.example.com}/january"
+
+  # ──────────────────────────────────────────────
+  # Autumn (File Server)
+  # ──────────────────────────────────────────────
+  autumn:
+    image: ghcr.io/stoatchat/file-server:v0.11.0
+    container_name: stoat-autumn
+    restart: always
+    networks:
+      - stoat_network
+    volumes:
+      - ./configs/Revolt.toml:/Revolt.toml:ro
+    depends_on:
+      - minio
+
+  # ──────────────────────────────────────────────
+  # January (Metadata & Image Proxy)
+  # ──────────────────────────────────────────────
+  january:
+    image: ghcr.io/stoatchat/proxy:v0.11.0
+    container_name: stoat-january
+    restart: always
+    networks:
+      - stoat_network
+    volumes:
+      - ./configs/Revolt.toml:/Revolt.toml:ro
+
+  # ──────────────────────────────────────────────
+  # Gifbox (Tenor GIF Proxy)
+  # ──────────────────────────────────────────────
+  gifbox:
+    image: ghcr.io/stoatchat/gifbox:v0.11.0
+    container_name: stoat-gifbox
+    restart: always
+    networks:
+      - stoat_network
+    volumes:
+      - ./configs/Revolt.toml:/Revolt.toml:ro
+
+  # ──────────────────────────────────────────────
+  # Crond (Task Daemon)
+  # ──────────────────────────────────────────────
+  crond:
+    image: ghcr.io/stoatchat/crond:v0.11.0
+    container_name: stoat-crond
+    restart: always
+    networks:
+      - stoat_network
+    volumes:
+      - ./configs/Revolt.toml:/Revolt.toml:ro
+    depends_on:
+      database:
+        condition: service_healthy
+
+  # ──────────────────────────────────────────────
+  # Pushd (Push Notification Daemon)
+  # ──────────────────────────────────────────────
+  pushd:
+    image: ghcr.io/stoatchat/pushd:v0.11.0
+    container_name: stoat-pushd
+    restart: always
+    networks:
+      - stoat_network
+    volumes:
+      - ./configs/Revolt.toml:/Revolt.toml:ro
+    depends_on:
+      rabbit:
+        condition: service_healthy
+
+  # ──────────────────────────────────────────────
+  # Voice Ingress
+  # ──────────────────────────────────────────────
+  voice-ingress:
+    image: ghcr.io/stoatchat/voice-ingress:v0.11.0
+    container_name: stoat-voice-ingress
+    restart: always
+    networks:
+      - stoat_network
+    volumes:
+      - ./configs/Revolt.toml:/Revolt.toml:ro
+    depends_on:
+      - livekit-server
