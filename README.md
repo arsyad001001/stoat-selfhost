@@ -7,7 +7,36 @@ If you want an ansible example check out `ansible-example-role`.
 
 # Self hosting [stoat](https://stoat.chat) with voice and video support
 
-<!-- toc -->
+- [Issues and PRs to keep track of voice and video progress](#issues-and-prs-to-keep-track-of-voice-and-video-progress)
+- [Quick Reference: Credentials to Generate](#quick-reference-credentials-to-generate)
+  * [Generating LiveKit Keys](#generating-livekit-keys)
+- [Architecture Overview](#architecture-overview)
+  * [The Three Layers](#the-three-layers)
+  * [Configuration Split: Revolt.toml vs Environment Variables](#configuration-split-revolttoml-vs-environment-variables)
+- [Docker Networking](#docker-networking)
+- [Voice/Video - The Non-Obvious Stuff](#voicevideo---the-non-obvious-stuff)
+- [LiveKit](#livekit)
+  * [The Patched Web Client](#the-patched-web-client)
+  * [Node Configuration: The lat/lon Requirement](#node-configuration-the-latlon-requirement)
+  * [Node Naming Must Match](#node-naming-must-match)
+  * [Port Requirements](#port-requirements)
+- [MinIO S3 Storage - Virtual Host Addressing](#minio-s3-storage---virtual-host-addressing)
+- [Service Dependencies](#service-dependencies)
+- [Common Gotchas](#common-gotchas)
+  * [EMPTY CACHE AND HARD RELOAD](#empty-cache-and-hard-reload)
+  * ["missing field `lat`" Panic](#missing-field-lat-panic)
+  * [Voice/Video Buttons Missing](#voicevideo-buttons-missing)
+  * [Files Not Uploading](#files-not-uploading)
+  * [WebSocket Connection Failures](#websocket-connection-failures)
+  * [Services Can't Find Each Other](#services-cant-find-each-other)
+  * [API Starts Then Crashes](#api-starts-then-crashes)
+- [Internal Service Ports](#internal-service-ports)
+- [The Caddy Configuration](#the-caddy-configuration)
+- [Using Your Own Reverse Proxy](#using-your-own-reverse-proxy)
+  * [Critical: WebSocket Support](#critical-websocket-support)
+  * [Route Summary](#route-summary)
+
+<!-- tocstop -->
 
 Stoat is currently in a transitionary period, therefore the
 documentation for self hosting with voice and video support
